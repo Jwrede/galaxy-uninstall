@@ -66,7 +66,15 @@ def ansible_view(galaxy: str, extra_paths: list[str]) -> tuple[list[str], dict]:
     cmd = [galaxy, "collection", "list", "--format", "json"]
     for p in extra_paths:
         cmd += ["-p", p]
-    return configured, _run_json(cmd)
+    try:
+        listing = _run_json(cmd)
+    except Error as exc:
+        # older ansible-core (seen with 2.15 and 2.17) fails instead of printing {}
+        # when none of the collection paths exists yet
+        if "None of the provided paths were usable" not in str(exc):
+            raise
+        listing = {}
+    return configured, listing
 
 
 def _norm(p: str | Path) -> Path:

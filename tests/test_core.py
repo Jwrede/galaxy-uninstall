@@ -229,3 +229,27 @@ def test_cli_usage_errors(run):
         run()
     with pytest.raises(SystemExit):
         run("--shadowed", "demo.app")
+
+
+def test_no_existing_paths_on_old_ansible(monkeypatch):
+    import subprocess
+
+    def fake(cmd, **kw):
+        if cmd[1] == "dump":
+            return subprocess.CompletedProcess(cmd, 0, '[{"name": "COLLECTIONS_PATHS", "value": ["/x"]}]', "")
+        raise subprocess.CalledProcessError(
+            5, cmd, "", "ERROR! - None of the provided paths were usable. Please specify a valid path")
+    monkeypatch.setattr(core.subprocess, "run", fake)
+    assert core.ansible_view("ansible-galaxy", []) == (["/x"], {})
+
+
+def test_other_listing_errors_are_reported(monkeypatch):
+    import subprocess
+
+    def fake(cmd, **kw):
+        if cmd[1] == "dump":
+            return subprocess.CompletedProcess(cmd, 0, "[]", "")
+        raise subprocess.CalledProcessError(1, cmd, "", "ERROR! something else")
+    monkeypatch.setattr(core.subprocess, "run", fake)
+    with pytest.raises(core.Error, match="something else"):
+        core.ansible_view("ansible-galaxy", [])
